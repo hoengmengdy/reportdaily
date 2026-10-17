@@ -6,11 +6,12 @@ import os
 from pathlib import Path
 import sqlite3
 import tempfile
+import tomllib
 import unittest
 from unittest.mock import MagicMock, patch
 
 import test_app
-from server import AppError, Store
+from server import AppError, ROOT, Store
 from postgres_store import PgConnection, translate_sql, validate_database_url
 from migrate_to_postgres import connection_input, import_snapshot, read_connection_url, snapshot
 
@@ -125,6 +126,16 @@ class PostgresAdapterTests(unittest.TestCase):
         self.assertNotIn(values[0], sql)
         self.assertEqual(params, values)
         self.assertEqual(result.lastrowid, 42)
+
+
+class DeploymentManifestTests(unittest.TestCase):
+    def test_vercel_pyproject_declares_all_runtime_requirements(self):
+        project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        requirements = {line.strip() for line in (ROOT / "requirements.txt").read_text().splitlines()
+                        if line.strip() and not line.startswith("#")}
+        self.assertEqual(set(project["project"]["dependencies"]), requirements)
+        self.assertFalse(project["tool"]["uv"]["package"])
+        self.assertEqual(project["tool"]["vercel"]["entrypoint"], "app:app")
 
 
 class ConnectionInputTests(unittest.TestCase):
