@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Track your Facebook pages, daily publishing targets, and reporting history.">
+  <title>Daily Facebook Report</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></symbol>
+    <symbol id="i-pages" viewBox="0 0 24 24"><rect x="5" y="3" width="15" height="16" rx="2"/><path d="M15 22H4a2 2 0 0 1-2-2V8M9 8h7M9 12h7M9 16h4"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 11a9 9 0 1 1 2.6 7.4M3 4v7h7M12 7v5l3 2"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M7 17 17 7M7 7h10v10"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="m15 4 5 5M4 20l5-1L21 7a2 2 0 0 0-5-5L4 14z"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M20 21H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h13l4 4v13a1 1 0 0 1-1 1ZM7 3v6h10V3M7 21v-8h10v8"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 4H4v16h5M10 12h11m-4-4 4 4-4 4"/></symbol>
+  </svg>
+
+  <section id="login-screen" class="login-screen" hidden>
+    <div class="login-intro">
+      <div class="brand-mark">d<span>.</span></div>
+      <p class="eyebrow">YOUR DAILY PUBLISHING WORKSPACE</p>
+      <h1>Every page.<br>Every post.<br><span>All in view.</span></h1>
+      <p>A clearer picture of your team's publishing progress, one day at a time.</p>
+      <div class="login-foot">DAILY FACEBOOK REPORT <span>● Asia/Bangkok</span></div>
+    </div>
+    <div class="login-form-wrap">
+      <form id="login-form" class="login-form">
+        <div class="login-mini-brand">daily<span>report</span></div>
+        <h2 id="login-title">Welcome back</h2>
+        <p id="login-description" class="muted">Sign in to your reporting workspace.</p>
+        <label for="username">Username</label>
+        <input id="username" name="username" autocomplete="username" required maxlength="64" autofocus>
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="1024">
+        <div id="confirm-password-field" hidden>
+          <label for="confirm-password">Confirm password</label>
+          <input id="confirm-password" name="confirm-password" type="password" autocomplete="new-password" maxlength="1024">
+        </div>
+        <p id="login-error" class="form-error" role="alert" hidden></p>
+        <button id="login-submit" class="button primary" type="submit">Sign in <span aria-hidden="true">→</span></button>
+        <p id="login-note" class="login-note">Use the account created by your administrator.</p>
+        <button id="viewer-login" class="button secondary" type="button" hidden>View reports · no password <span aria-hidden="true">→</span></button>
+      </form>
+    </div>
+  </section>
+
+  <div id="app" class="app-layout" hidden>
+    <aside class="sidebar">
+      <a class="brand" href="#daily" aria-label="Daily Report home"><span class="brand-mark small">d<span>.</span></span><span>daily<span class="brand-light">report</span></span></a>
+      <div class="workspace"><span class="workspace-icon">f</span><div>Facebook workspace<small>Publishing & performance</small></div><span class="workspace-dot"></span></div>
+      <p class="nav-label">WORKSPACE</p>
+      <nav aria-label="Main navigation">
+        <button data-view="daily" class="nav-item active"><svg class="icon"><use href="#i-grid"/></svg>Daily overview</button>
+        <button data-view="pages" class="nav-item"><svg class="icon"><use href="#i-pages"/></svg>Facebook pages<span id="nav-page-count" class="nav-count">—</span></button>
+        <button data-view="history" class="nav-item"><svg class="icon"><use href="#i-history"/></svg>Report history</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="timezone"><span class="live-dot"></span>Asia/Bangkok <span>UTC +07</span></div>
+        <div class="account"><span id="user-avatar" class="avatar">U</span><div><strong id="user-name"></strong><small id="user-role"></small></div><button id="logout" class="icon-button" aria-label="Sign out" title="Sign out"><svg class="icon"><use href="#i-logout"/></svg></button></div>
+      </div>
+    </aside>
+
+    <div class="main-shell">
+      <header class="topbar"><div><span class="breadcrumb">Workspace</span><span class="breadcrumb-separator">/</span><strong id="breadcrumb-current">Daily overview</strong></div><span class="topbar-status"><span class="live-dot"></span>Daily Facebook Report System</span></header>
+      <main>
+        <section id="daily-view" class="view">
+          <div class="page-heading"><div><p class="eyebrow">PUBLISH WITH A PLAN</p><h1>Daily overview</h1><p class="muted">A little progress, on every page. Keep your daily posts on track.</p></div><div class="date-field"><label for="report-date">REPORT DATE</label><input type="date" id="report-date" required></div></div>
+          <div class="stats-grid" id="daily-stats">
+            <article class="stat-card"><div class="stat-label">Facebook pages<svg class="icon"><use href="#i-pages"/></svg></div><strong id="stat-pages">—</strong><small>Pages in this report</small></article>
+            <article class="stat-card"><div class="stat-label">Daily post target<svg class="icon"><use href="#i-target"/></svg></div><strong id="stat-target">—</strong><small>Expected posts</small></article>
+            <article class="stat-card"><div class="stat-label">Actual posts<svg class="icon"><use href="#i-check"/></svg></div><strong id="stat-actual">—</strong><small id="actual-caption">Completed today</small></article>
+            <article class="stat-card"><div class="stat-label">Remaining posts<svg class="icon"><use href="#i-clock"/></svg></div><strong id="stat-remaining">—</strong><small>Across unfinished pages</small></article>
+          </div>
+          <section class="progress-panel" aria-label="Daily completion"><div class="progress-copy"><span class="progress-icon"><svg class="icon"><use href="#i-target"/></svg></span><div><h2>Today's progress</h2><p id="progress-caption">Loading your report…</p></div></div><div class="progress-meter"><div><span>Daily completion</span><strong id="stat-completion">0%</strong></div><progress id="daily-progress" max="100" value="0">0%</progress></div></section>
+          <section class="panel report-panel">
+            <div class="panel-heading"><div><h2>Page performance <span id="report-row-count" class="count-pill">0</span></h2><p id="report-save-state" class="muted">Loading…</p></div><div class="button-group"><button class="button secondary export-button" data-format="csv"><svg class="icon"><use href="#i-download"/></svg>CSV</button><button class="button secondary export-button" data-format="xlsx"><svg class="icon"><use href="#i-download"/></svg>Excel</button><button id="save-report" class="button primary"><svg class="icon"><use href="#i-save"/></svg>Save report</button></div></div>
+            <div class="table-toolbar"><label class="search-box"><svg class="icon"><use href="#i-search"/></svg><input id="report-search" placeholder="Search pages…" aria-label="Search report pages"></label><div class="filter-tabs" role="group" aria-label="Filter page status"><button data-filter="all" class="active">All pages</button><button data-filter="below">Below target</button><button data-filter="reached">Reached</button></div></div>
+            <div class="table-scroll"><table class="data-table report-table"><thead><tr><th scope="col">PAGE NAME</th><th scope="col">FACEBOOK LINK</th><th scope="col" class="number">DAILY TARGET</th><th scope="col" class="number">ACTUAL POSTS</th><th scope="col">STATUS</th></tr></thead><tbody id="report-body"></tbody><tfoot><tr><th scope="row" colspan="2">Daily total <small>All report pages</small></th><td id="total-target" class="number">0</td><td id="total-actual" class="number">0</td><td id="total-reached"></td></tr></tfoot></table></div>
+            <div class="panel-foot"><span id="report-visible-count"></span><span>Saved reports keep their original page details and targets.</span></div>
+          </section>
+          <p class="page-footnote">Completion counts progress toward each page's target. Extra posts on one page don't reduce another page's remaining work.</p>
+        </section>
+
+        <section id="pages-view" class="view" hidden>
+          <div class="page-heading"><div><p class="eyebrow">YOUR PUBLISHING ROSTER</p><h1>Facebook pages</h1><p class="muted">Manage the pages and daily targets that power your reports.</p></div><button id="add-page" class="button primary"><svg class="icon"><use href="#i-plus"/></svg>Add page</button></div>
+          <div class="roster-summary"><div><span class="summary-label">ACTIVE FACEBOOK PAGES</span><strong id="pages-count">—</strong></div><span class="summary-divider"></span><div><span class="summary-label">TOTAL DAILY POST TARGET</span><strong id="pages-target">—</strong></div><p>Targets are calculated automatically.<br>Changes apply to reports that haven't been saved yet.</p></div>
+          <section class="panel"><div class="panel-heading"><div><h2>All pages</h2><p class="muted">Original names, profile links, and publishing expectations.</p></div><label class="search-box"><svg class="icon"><use href="#i-search"/></svg><input id="pages-search" placeholder="Search pages…" aria-label="Search managed pages"></label></div><div class="table-scroll"><table class="data-table"><thead><tr><th scope="col">PAGE NAME</th><th scope="col">FACEBOOK PROFILE URL</th><th scope="col" class="number">DAILY TARGET</th><th scope="col" class="admin-column">ACTIONS</th></tr></thead><tbody id="pages-body"></tbody></table></div><div class="panel-foot"><span id="pages-visible-count"></span><span>Deleting a page preserves its saved report history.</span></div></section>
+        </section>
+
+        <section id="history-view" class="view" hidden>
+          <div class="page-heading"><div><p class="eyebrow">THE BIGGER PICTURE</p><h1>Report history</h1><p class="muted">Revisit daily results and see how the month adds up.</p></div><div class="date-field"><label for="history-month">REPORT MONTH</label><input id="history-month" type="month" required></div></div>
+          <div class="stats-grid history-stats"><article class="stat-card"><div class="stat-label">Saved report days</div><strong id="history-days">0</strong><small>In the selected month</small></article><article class="stat-card"><div class="stat-label">Target posts</div><strong id="history-target">0</strong><small>Across saved reports</small></article><article class="stat-card"><div class="stat-label">Actual posts</div><strong id="history-actual">0</strong><small>Across saved reports</small></article><article class="stat-card"><div class="stat-label">Monthly completion</div><strong id="history-completion">0%</strong><small id="history-remaining">0 posts remaining</small></article></div>
+          <section class="panel"><div class="panel-heading"><div><h2>Daily reports</h2><p class="muted">Open a day to review, update, or export its report.</p></div><span id="history-month-label" class="month-label"></span></div><div class="table-scroll"><table class="data-table"><thead><tr><th scope="col">REPORT DATE</th><th scope="col" class="number">PAGES</th><th scope="col" class="number">TARGET POSTS</th><th scope="col" class="number">ACTUAL POSTS</th><th scope="col">COMPLETION</th><th scope="col">REPORT</th></tr></thead><tbody id="history-body"></tbody></table></div></section>
+          <p class="page-footnote">Monthly totals include saved days only. Unsaved days aren't counted as zero-post reports.</p>
+        </section>
+        <div id="view-error" class="view-error" role="alert" hidden><span></span><button id="retry-load" class="button secondary">Try again</button></div>
+      </main>
+      <footer class="app-footer"><span>Daily Report <span class="footer-dot">/</span> Made for a more consistent day.</span><span>Asia/Bangkok · UTC +07:00</span></footer>
+    </div>
+  </div>
+
+  <dialog id="page-dialog"><form id="page-form"><div class="dialog-heading"><div><p class="eyebrow">FACEBOOK PAGE</p><h2 id="page-dialog-title">Add page</h2></div><button type="button" class="close-dialog icon-button" aria-label="Close">×</button></div><p class="muted">Set the profile and daily publishing target.</p><input type="hidden" id="page-id"><label for="page-name">Page name</label><input id="page-name" required maxlength="200" autocomplete="off"><label for="page-url">Facebook profile URL</label><input id="page-url" type="url" required maxlength="2048" placeholder="https://www.facebook.com/profile.php?id=…"><label for="page-target">Daily post target</label><input id="page-target" type="number" min="0" max="1000000" step="1" required value="3"><p class="field-hint">Use whole numbers. A target of 0 means no posts are required.</p><p id="page-error" class="form-error" role="alert" hidden></p><div class="dialog-actions"><button type="button" class="button secondary close-dialog">Cancel</button><button type="submit" id="page-submit" class="button primary">Save page</button></div></form></dialog>
+  <dialog id="delete-dialog"><div class="dialog-heading"><h2>Delete this page?</h2><button type="button" class="icon-button close-delete" aria-label="Close">×</button></div><p id="delete-name" class="delete-name"></p><p class="muted">It will be removed from the active page list. Saved reports will retain the page and all its completed posts.</p><p id="delete-error" class="form-error" role="alert" hidden></p><div class="dialog-actions"><button type="button" class="button secondary close-delete">Cancel</button><button id="confirm-delete" class="button danger">Delete page</button></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <div id="loading-screen" class="loading-screen"><span class="brand-mark small">d<span>.</span></span><p>Opening your workspace…</p></div>
+  <noscript><p>This reporting system needs JavaScript enabled. Run python server.py and open http://127.0.0.1:8000.</p></noscript>
+</body>
+</html>
