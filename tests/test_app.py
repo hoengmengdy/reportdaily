@@ -55,7 +55,7 @@ class DatabaseTests(unittest.TestCase):
         self.assertEqual(current[0]["url"], changed["url"])
         with self.store.connect() as db:
             self.assertEqual(db.execute("SELECT count(*) FROM pages").fetchone()[0], 14)
-            self.assertEqual(db.execute("SELECT count(*) FROM schema_migrations").fetchone()[0], 2)
+            self.assertEqual(db.execute("SELECT count(*) FROM schema_migrations").fetchone()[0], 3)
 
     def test_duplicate_ids_and_restore(self):
         page = self.store.pages()[0]
@@ -267,8 +267,8 @@ class HttpTests(unittest.TestCase):
     def setUp(self):
         self.cookie = ""
         self.csrf = ""
-        with self.server.login_lock:
-            self.server.login_attempts.clear()
+        with self.store.connect() as db:
+            db.execute("DELETE FROM login_limits")
 
     def request(self, method, path, data=None, headers=None):
         connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=10)

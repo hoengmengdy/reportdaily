@@ -48,6 +48,11 @@
           <label for="confirm-password">Confirm password</label>
           <input id="confirm-password" name="confirm-password" type="password" autocomplete="new-password" maxlength="1024">
         </div>
+        <div id="setup-key-field" hidden>
+          <label for="setup-key">Private setup key</label>
+          <input id="setup-key" type="password" autocomplete="off" minlength="32">
+          <p class="field-hint">Enter the SETUP_TOKEN you saved privately in Vercel.</p>
+        </div>
         <p id="login-error" class="form-error" role="alert" hidden></p>
         <button id="login-submit" class="button primary" type="submit">Sign in <span aria-hidden="true">→</span></button>
         <p id="login-note" class="login-note">Use the account created by your administrator.</p>

@@ -2,7 +2,7 @@
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
-const state = { user: null, csrf: "", today: "", view: "daily", pages: [], report: null, dirty: false, filter: "all", busy: false, loading: false, setup: false, setupToken: "", viewerUsername: "" };
+const state = { user: null, csrf: "", today: "", view: "daily", pages: [], report: null, dirty: false, filter: "all", busy: false, loading: false, setup: false, setupToken: "", viewerUsername: "", setupKeyRequired: false };
 const number = (n) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(n);
 const esc = (value) => String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const icon = (name) => `<svg class="icon" aria-hidden="true"><use href="#i-${name}"/></svg>`;
@@ -23,15 +23,32 @@ function showError(selector, message) {
   el.hidden = !message;
 }
 
+async function readApiResponse(response) {
+  const contentType = response.headers.get("Content-Type") || "";
+  if (!contentType.toLowerCase().includes("application/json")) {
+    if (response.status === 404) {
+      throw new Error("The report API is missing (HTTP 404). Deploy the latest project code with the Flask preset in Vercel.");
+    }
+    throw new Error(`The report server returned a page instead of JSON (HTTP ${response.status}). Check the Vercel deployment and backend logs.`);
+  }
+  try {
+    const result = await response.json();
+    if (!result || typeof result !== "object" || Array.isArray(result)) throw new Error("Invalid response shape");
+    return result;
+  } catch {
+    throw new Error(`The report API returned invalid JSON (HTTP ${response.status}). Check the backend deployment.`);
+  }
+}
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     credentials: "same-origin",
     ...options,
     headers: { "Content-Type": "application/json", "X-CSRF-Token": state.csrf, ...(options.headers || {}) },
   });
-  const result = await response.json();
+  if (response.status === 401 && path !== "/api/login") showLogin();
+  const result = await readApiResponse(response);
   if (!response.ok) {
-    if (response.status === 401 && path !== "/api/login") showLogin();
     throw new Error(result.error || "The request could not be completed.");
   }
   return result;
@@ -58,6 +75,8 @@ function setSetupMode(setup, token = "") {
   $("#password").minLength = setup ? 12 : 0;
   $("#password").autocomplete = setup ? "new-password" : "current-password";
   $("#viewer-login").hidden = setup || !state.viewerUsername;
+  $("#setup-key-field").hidden = !setup || !state.setupKeyRequired;
+  $("#setup-key").required = setup && state.setupKeyRequired;
 }
 
 async function openWorkspace(session) {
@@ -281,7 +300,9 @@ $("#login-form").addEventListener("submit", async (event) => {
     const credentials = { username: $("#username").value, password: $("#password").value };
     if (state.setup) {
       if (credentials.password !== $("#confirm-password").value) throw new Error("Passwords do not match.");
-      await api("/api/setup", { method: "POST", headers: { "X-Setup-Token": state.setupToken }, body: JSON.stringify(credentials) });
+      const created = await api("/api/setup", { method: "POST", headers: { "X-Setup-Token": state.setupKeyRequired ? $("#setup-key").value : state.setupToken }, body: JSON.stringify(credentials) });
+      state.viewerUsername = created.viewer || "";
+      $("#setup-key").value = "";
       $("#confirm-password").value = "";
       setSetupMode(false);
     }
@@ -356,7 +377,7 @@ $$(".export-button").forEach((button) => button.addEventListener("click", async 
   try {
     const response = await fetch(`/api/export.${format}?date=${state.report.date}`, { credentials: "same-origin" });
     if (!response.ok) {
-      const result = await response.json();
+      const result = await readApiResponse(response);
       if (response.status === 401) showLogin();
       throw new Error(result.error);
     }
@@ -455,10 +476,11 @@ document.addEventListener("keydown", (event) => {
   try {
     const setup = await api("/api/setup");
     state.viewerUsername = setup.viewer || "";
+    state.setupKeyRequired = Boolean(setup.token_required);
     if (setup.needed) {
       showLogin();
       if (setup.enabled) setSetupMode(true, setup.token);
-      else showError("#login-error", "Create your administrator on the server with python server.py --create-user.");
+      else showError("#login-error", "Set a private SETUP_TOKEN (at least 32 characters) in Vercel Environment Variables and redeploy, or create your administrator locally with python server.py --create-user.");
       return;
     }
     setSetupMode(false);

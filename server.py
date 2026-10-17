@@ -12,6 +12,7 @@ from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import io
 import json
+import os
 from pathlib import Path
 import re
 import secrets
@@ -173,7 +174,7 @@ class Store:
             row = db.execute("SELECT username FROM users WHERE role='viewer' AND passwordless=1 ORDER BY id LIMIT 1").fetchone()
             return row["username"] if row else None
 
-    def create_first_admin(self, username, password):
+    def create_first_admin(self, username, password, *, with_public_viewer=False):
         if not isinstance(username, str) or not re.fullmatch(r"[A-Za-z0-9_.-]{3,64}", username):
             raise AppError("Username must be 3–64 letters, numbers, dots, underscores, or hyphens.")
         hashed = password_hash(password)
@@ -182,6 +183,27 @@ class Store:
             if db.execute("SELECT 1 FROM users LIMIT 1").fetchone():
                 raise AppError("Account setup is already complete. Please sign in.", 409)
             db.execute("INSERT INTO users(username,password_hash,role) VALUES (?,?,'admin')", (username, hashed))
+            if with_public_viewer:
+                viewer_name = "viewer" if username.lower() != "viewer" else "report-viewer"
+                db.execute("INSERT INTO users(username,password_hash,role,passwordless) VALUES (?,'','viewer',1)", (viewer_name,))
+
+    def reserve_login_attempt(self, client_key):
+        key = hashlib.sha256(client_key.encode()).hexdigest()
+        now = int(time.time())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute("DELETE FROM login_limits WHERE started_at<=?", (now - 900,))
+            row = db.execute("SELECT attempts FROM login_limits WHERE client_key=?", (key,)).fetchone()
+            if row and row["attempts"] >= 10:
+                raise AppError("Too many sign-in attempts. Try again in 15 minutes.", 429)
+            if row:
+                db.execute("UPDATE login_limits SET attempts=attempts+1 WHERE client_key=?", (key,))
+            else:
+                db.execute("INSERT INTO login_limits VALUES (?,1,?)", (key, now))
+
+    def clear_login_attempts(self, client_key):
+        with self.connect() as db:
+            db.execute("DELETE FROM login_limits WHERE client_key=?", (hashlib.sha256(client_key.encode()).hexdigest(),))
 
     def pages(self):
         with self.connect() as db:
@@ -333,10 +355,10 @@ class ReportServer(ThreadingHTTPServer):
     def __init__(self, address, store, secure_cookie=False):
         self.store = store
         self.secure_cookie = secure_cookie
-        self.login_attempts = {}
-        self.login_lock = threading.Lock()
         self.setup_token = secrets.token_urlsafe(32)
         self.allow_local_setup = address[0] == "127.0.0.1"
+        self.allow_hosted_setup = False
+        self.enable_public_viewer = False
         # A real hash also equalizes unknown-user password checks.
         self.dummy_hash = password_hash(secrets.token_urlsafe(32))
         super().__init__(address, Handler)
@@ -422,13 +444,7 @@ class Handler(BaseHTTPRequestHandler):
         if not isinstance(username, str) or not isinstance(password, str) or len(username) > 64 or len(password) > 1024:
             raise AppError("Invalid username or password.", 401)
         key, now = self.client_address[0], time.time()
-        with self.server.login_lock:
-            # Bound memory and reserve an attempt before expensive hashing.
-            self.server.login_attempts = {k: v for k, v in self.server.login_attempts.items() if v[1] > now - 900}
-            attempts, _ = self.server.login_attempts.get(key, (0, now))
-            if attempts >= 10:
-                raise AppError("Too many sign-in attempts. Try again in 15 minutes.", 429)
-            self.server.login_attempts[key] = (attempts + 1, now)
+        self.server.store.reserve_login_attempt(key)
         with self.server.store.connect() as db:
             user = db.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
             correct = bool(user and user["role"] == "viewer" and user["passwordless"] == 1)
@@ -439,27 +455,29 @@ class Handler(BaseHTTPRequestHandler):
             token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
             db.execute("DELETE FROM sessions WHERE expires_at<=?", (int(now),))
             db.execute("INSERT INTO sessions VALUES (?,?,?,?)", (hashlib.sha256(token.encode()).hexdigest(), user["id"], csrf, int(now) + SESSION_SECONDS))
-        with self.server.login_lock:
-            self.server.login_attempts.pop(key, None)
+        self.server.store.clear_login_attempts(key)
         self.respond(200, {"user": {"username": user["username"], "role": user["role"]}, "csrf": csrf, "today": today()}, headers={"Set-Cookie": self.cookie(token, SESSION_SECONDS)})
 
     def first_run_setup(self, method):
         self.same_origin()
         local = self.server.allow_local_setup and self.client_address[0] == "127.0.0.1"
+        hosted = self.server.allow_hosted_setup
         needed = self.server.store.needs_setup()
         if method == "GET":
-            self.respond(200, {"needed": needed, "enabled": local, "viewer": self.server.store.shared_viewer(),
+            self.respond(200, {"needed": needed, "enabled": local or hosted, "viewer": self.server.store.shared_viewer(),
+                               "token_required": hosted and not local and needed,
                                "token": self.server.setup_token if local and needed else None})
             return
-        if not local:
-            raise AppError("Browser setup is only available on the local loopback server. Use python server.py --create-user.", 403)
+        if not (local or hosted):
+            raise AppError("Set a private SETUP_TOKEN in Vercel settings, or create your administrator locally with python server.py --create-user.", 403)
         if not hmac.compare_digest(self.headers.get("X-Setup-Token", ""), self.server.setup_token):
             raise AppError("Invalid setup token. Reload this page.", 403)
         if not needed:
             raise AppError("Account setup is already complete. Please sign in.", 409)
         data = self.body()
-        self.server.store.create_first_admin(data.get("username"), data.get("password"))
-        self.respond(201, {"ok": True})
+        self.server.store.create_first_admin(data.get("username"), data.get("password"),
+                                             with_public_viewer=self.server.enable_public_viewer)
+        self.respond(201, {"ok": True, "viewer": self.server.store.shared_viewer()})
 
     def dispatch(self, method):
         try:
@@ -553,7 +571,11 @@ def main():
     args = parser.parse_args()
     if args.passwordless and (not args.create_user or args.role != "viewer"):
         parser.error("--passwordless requires --create-user --role viewer")
-    store = Store(args.db)
+    if os.environ.get("DATABASE_URL"):
+        from postgres_store import PostgresStore
+        store = PostgresStore(os.environ["DATABASE_URL"])
+    else:
+        store = Store(args.db)
     if args.create_user:
         try:
             username = input("Username: ").strip()
